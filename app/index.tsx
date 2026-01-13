@@ -1,99 +1,62 @@
-import { View, StyleSheet, Text } from "react-native";
+import { View, StyleSheet, Text, Animated } from "react-native";
 import { useEffect, useRef, useState } from "react";
-import { GLView } from "expo-gl";
-import * as THREE from "three";
-import { Renderer } from "expo-three";
 import { useAccelerometer } from "@/lib/modules/sensors/accelerometer/useAccelerometer";
-import * as Haptics from "expo-haptics";
-import { Audio } from "expo-av";
 
-export default function Dice3DScreen() {
+export default function DiceScreen() {
   const shake = useAccelerometer();
-  const cubeRef = useRef<THREE.Mesh | null>(null);
+  const rotateX = useRef(new Animated.Value(0)).current;
+  const rotateY = useRef(new Animated.Value(0)).current;
   const [value, setValue] = useState(1);
 
-  // 🔊 Sonido
-  const soundRef = useRef<Audio.Sound | null>(null);
-
   useEffect(() => {
-    (async () => {
-      const { sound } = await Audio.Sound.createAsync(
-        require("../assets/dice.mp3") // luego te digo cómo crear este archivo
-      );
-      soundRef.current = sound;
-    })();
-
-    return () => {
-      soundRef.current?.unloadAsync();
-    };
-  }, []);
-
-  const onContextCreate = async (gl: any) => {
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#111");
-
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      gl.drawingBufferWidth / gl.drawingBufferHeight,
-      0.1,
-      100
-    );
-    camera.position.z = 4;
-
-    const renderer = new Renderer({ gl });
-    renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
-    renderer.setClearColor("#111");
-
-    // 💡 LUCES (CLAVE)
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 5, 5);
-    scene.add(light);
-
-    // 🎲 CUBO (DADO)
-    const geometry = new THREE.BoxGeometry(1.5, 1.5, 1.5);
-    const material = new THREE.MeshStandardMaterial({
-      color: "#eaeaea",
-      roughness: 0.3,
-      metalness: 0.1
-    });
-
-    const cube = new THREE.Mesh(geometry, material);
-    cubeRef.current = cube;
-    scene.add(cube);
-
-    const animate = () => {
-      requestAnimationFrame(animate);
-
-      renderer.render(scene, camera);
-      gl.endFrameEXP();
-    };
-
-    animate();
-  };
-
-  // 🎯 REACCIÓN AL SHAKE
-  useEffect(() => {
-    if (shake && cubeRef.current) {
-      // 🔄 Rotación controlada
-      cubeRef.current.rotation.x += Math.PI * 2;
-      cubeRef.current.rotation.y += Math.PI * 2;
-
-      // 🎲 Valor del dado
-      setValue(Math.floor(Math.random() * 6) + 1);
-
-      // 📳 Vibración
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-
-      // 🔊 Sonido
-      soundRef.current?.replayAsync();
+    if (shake) {
+      Animated.parallel([
+        Animated.timing(rotateX, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true
+        }),
+        Animated.timing(rotateY, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true
+        })
+      ]).start(() => {
+        rotateX.setValue(0);
+        rotateY.setValue(0);
+        setValue(Math.floor(Math.random() * 6) + 1);
+      });
     }
   }, [shake]);
 
+  const spinX = rotateX.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"]
+  });
+
+  const spinY = rotateY.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "360deg"]
+  });
+
   return (
     <View style={styles.container}>
-      <GLView style={styles.gl} onContextCreate={onContextCreate} />
-      <Text style={styles.text}>Resultado: {value}</Text>
+      <Animated.View
+        style={[
+          styles.dice,
+          {
+            transform: [
+              { perspective: 800 },
+              { rotateX: spinX },
+              { rotateY: spinY }
+            ]
+          }
+        ]}
+      >
+        <Text style={styles.number}>{value}</Text>
+      </Animated.View>
+
+      <Text style={styles.label}>Agita el celular 🎲</Text>
     </View>
   );
 }
@@ -101,15 +64,30 @@ export default function Dice3DScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#111"
+    backgroundColor: "#111",
+    justifyContent: "center",
+    alignItems: "center"
   },
-  gl: {
-    flex: 1
+  dice: {
+    width: 120,
+    height: 120,
+    backgroundColor: "#eaeaea",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 12
   },
-  text: {
-    textAlign: "center",
-    fontSize: 26,
+  number: {
+    fontSize: 48,
+    fontWeight: "bold",
+    color: "#111"
+  },
+  label: {
+    marginTop: 20,
     color: "white",
-    padding: 16
+    fontSize: 16
   }
 });

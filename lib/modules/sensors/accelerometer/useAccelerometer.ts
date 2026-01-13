@@ -7,7 +7,7 @@ export const useAccelerometer = () => {
   const cooldownRef = useRef(false);
 
   useEffect(() => {
-    const sub = SensorService.subscribe((data) => {
+    const subscription = SensorService.subscribe((data) => {
       if (!cooldownRef.current && isShaking(data)) {
         cooldownRef.current = true;
         setTrigger(true);
@@ -21,7 +21,7 @@ export const useAccelerometer = () => {
     });
 
     return () => {
-      SensorService.unsubscribe(sub);
+      SensorService.unsubscribe(subscription);
     };
   }, []);
 
